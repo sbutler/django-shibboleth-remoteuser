@@ -26,6 +26,10 @@ class ShibbolethRemoteUserBackend(ModelBackend):
     usernames that don't already exist in the database.  Subclasses can disable
     this behavior by setting the ``create_unknown_user`` attribute to
     ``False``.
+
+    Subclassers of this backend can gain more control over how the user attributes
+    are set from shibboleth. Simply override ``set_user_<attrname>(user, value)``
+    and it will be called from ``populate_user``.
     """
 
     # Create a User object if not already in the database?
@@ -96,14 +100,21 @@ class ShibbolethRemoteUserBackend(ModelBackend):
         Takes information from the Shibboleth metadata and populates the user
         object with it. The user will be saved by the caller after this
         completes.
+
+        Subclassers of this backend can gain more control over how the user
+        attributes are set from shibboleth. Simply override
+        ``set_user_<attrname>(user, value)`` and it wil be called.
         """
         for key, value in shib_meta.items():
-            if key == 'groups':
-                self.sync_user_groups(user, value)
+            method = getattr(self, 'set_user_' + key, None)
+            if method:
+                method(user, value)
             elif hasattr(user, key):
                 setattr(user, key, value)
+            else:
+                raise AttributeError("User model doesn't have attribute " + key)
 
-    def sync_user_groups(self, user, shib_groups):
+    def set_user_groups(self, user, shib_groups):
         """
         Takes a list of groups information from Shibboleth and maps them to
         Django groups.

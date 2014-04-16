@@ -99,7 +99,7 @@ class ShibbolethRemoteUserBackend(ModelBackend):
         """
         for key, value in shib_meta.items():
             if key == 'groups':
-                self.sync_groups(user, value)
+                self.sync_user_groups(user, value)
             elif hasattr(user, key):
                 setattr(user, key, value)
 

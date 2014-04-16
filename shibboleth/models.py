@@ -8,3 +8,7 @@ class GroupMapping(models.Model):
 
     group = models.ForeignKey(Group)
     attr_value = models.CharField(max_length=ATTR_VALUE_MAX_LENGTH, verbose_name='attribute value')
+
+    def __unicode__(self):
+        return self.group.name
+

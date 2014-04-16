@@ -119,8 +119,7 @@ class ShibbolethRemoteUserBackend(ModelBackend):
         Takes a list of groups information from Shibboleth and maps them to
         Django groups.
         """
-        mappings = GroupMapping.objects.select_related('group').all()
-        map_groupid_set = set([m.group.pk for m in mappings])
+        map_groupid_set = set(GroupMapping.objects.values_list('group__pk', flat=True))
 
         # Get a set of group ID's for the user, but only look at the ones
         # we're going to map
@@ -129,17 +128,18 @@ class ShibbolethRemoteUserBackend(ModelBackend):
         shib_groupname_set = set(shib_groups)
         shib_groupid_set = set()
         # Loop over each mapping and see if it's in our groups from Shib.
-        # This will give us a Shib -> Django Group set
-        for mapping in mappings:
-            if mapping.attr_value in shib_groupname_set:
-                shib_groupid_set.add(mapping.group.pk)
+        # This will give us a Shib -> Django Group set. We try to avoid
+        # fetching the entire group.
+        for groupid, attr_value in GroupMapping.objects.values_list('group__pk', 'attr_value'):
+            if attr_value in shib_groupname_set:
+                shib_groupid_set.add(groupid)
 
         # Shib groups minus the user groups gives us what to add.
         add_set = shib_groupid_set - user_groupid_set
-        for group in Group.objects.filter(pk__in=add_set):
-            user.groups.add(group)
+        if add_set:
+            user.groups.add(*(Group.objects.filter(pk__in=add_set)))
 
         # User groups minus shib groups gives up what to remove.
         rem_set = user_groupid_set - shib_groupid_set
-        for group in Group.objects.filter(pk__in=rem_set):
-            user.groups.remove(group)
+        if rem_set:
+            user.groups.remove(*(Group.objects.filter(pk__in=rem_set)))

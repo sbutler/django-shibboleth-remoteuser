@@ -1,6 +1,18 @@
-from django.db import connection
-from django.contrib.auth.models import User, Permission
+from django.contrib.auth.models import User, Group
 from django.contrib.auth.backends import ModelBackend
+import django.dispatch
+
+# Support Django 1.5's custom user models
+# From: django-auth-ldap/django_auth_ldap/backend.py?at=default
+try:
+    from django.contrib.auth import get_user_model
+except ImportError:
+    get_user_model = lambda: User
+
+
+# Signals to fire to allow other people to modify the user
+populate_user = django.dispatch.Signal(providing_args=['user', 'shib_meta'])
+
 
 class ShibbolethRemoteUserBackend(ModelBackend):
     """
@@ -31,20 +43,33 @@ class ShibbolethRemoteUserBackend(ModelBackend):
             return
         user = None
         username = self.clean_username(remote_user)
-	shib_user_params = dict([(k, shib_meta[k]) for k in User._meta.get_all_field_names() if k in shib_meta])
+
+        UserModel = get_user_model()
+        # Backwards compatable for custom User models
+        username_field = getattr(UserModel, 'USERNAME_FIELD', 'username')
 
 	# Note that this could be accomplished in one try-except clause, but
         # instead we use get_or_create when creating unknown users since it has
         # built-in safeguards for multiple threads.
         if self.create_unknown_user:
-            user, created = User.objects.get_or_create(**shib_user_params)
+            user, created = UserModel.objects.get_or_create(**{
+                username_field: username
+            })
             if created:
                 user = self.configure_user(user)
         else:
             try:
-                user = User.objects.get(**shib_user_params)
+                user = UserModel.objects.get(**{
+                    username_field: username
+                })
             except User.DoesNotExist:
                 pass
+
+        if user:
+            self.populate_user(user, shib_meta)
+            populate_user.send(self.__class__, user=user, shib_meta=shib_meta)
+            user.save()
+
         return user
 
     def clean_username(self, username):
@@ -63,3 +88,22 @@ class ShibbolethRemoteUserBackend(ModelBackend):
         By default, returns the user unmodified.
         """
         return user
+
+    def populate_user(self, user, shib_meta):
+        """
+        Takes information from the Shibboleth metadata and populates the user
+        object with it. The user will be saved by the caller after this
+        completes.
+        """
+        for key, value in shib_meta.items():
+            if key == 'groups':
+                self.sync_groups(user, value)
+            elif hasattr(user, key):
+                setattr(user, key, value)
+
+    def sync_user_groups(self, user, shib_groups):
+        """
+        Takes a list of groups information from Shibboleth and maps them to
+        Django groups.
+        """
+        pass

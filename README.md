@@ -19,7 +19,7 @@ Installation and configuration
     
     ```python
     AUTHENTICATION_BACKENDS += (
-      'django.contrib.auth.backends.RemoteUserBackend',
+      'shibboleth.backends.ShibbolethRemoteUserBackend',
     )
     ```
 
@@ -48,6 +48,7 @@ Installation and configuration
        "Shibboleth-givenName": (True, "first_name"),
        "Shibboleth-sn": (True, "last_name"),
        "Shibboleth-mail": (True, "email"),
+       "Shibboleth-isMemberOf": (False, "groups"),
     }
     ```
     

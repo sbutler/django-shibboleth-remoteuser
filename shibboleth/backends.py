@@ -2,6 +2,8 @@ from django.contrib.auth.models import User, Group
 from django.contrib.auth.backends import ModelBackend
 import django.dispatch
 
+from shibboleth.models import GroupMapping
+
 # Support Django 1.5's custom user models
 # From: django-auth-ldap/django_auth_ldap/backend.py?at=default
 try:
@@ -106,4 +108,27 @@ class ShibbolethRemoteUserBackend(ModelBackend):
         Takes a list of groups information from Shibboleth and maps them to
         Django groups.
         """
-        pass
+        mappings = GroupMapping.objects.select_related('group').all()
+        map_groupid_set = set([m.group.pk for m in mappings])
+
+        # Get a set of group ID's for the user, but only look at the ones
+        # we're going to map
+        user_groupid_set = set(user.groups.filter(pk__in=map_groupid_set).values_list('pk', flat=True))
+
+        shib_groupname_set = set(shib_groups)
+        shib_groupid_set = set()
+        # Loop over each mapping and see if it's in our groups from Shib.
+        # This will give us a Shib -> Django Group set
+        for mapping in mappings:
+            if mapping.attr_value in shib_groupname_set:
+                shib_groupid_set.add(mapping.group.pk)
+
+        # Shib groups minus the user groups gives us what to add.
+        add_set = shib_groupid_set - user_groupid_set
+        for group in Group.objects.filter(pk__in=add_set):
+            user.groups.add(group)
+
+        # User groups minus shib groups gives up what to remove.
+        rem_set = user_groupid_set - shib_groupid_set
+        for group in Group.objects.filter(pk__in=rem_set):
+            user.groups.remove(group)

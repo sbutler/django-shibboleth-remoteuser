@@ -48,7 +48,7 @@ Installation and configuration
        "Shibboleth-givenName": (True, "first_name"),
        "Shibboleth-sn": (True, "last_name"),
        "Shibboleth-mail": (True, "email"),
-       "Shibboleth-isMemberOf": (False, "groups"),
+       "Shibboleth-isMemberOf": (False, "groups\[\]"),
     }
     ```
     

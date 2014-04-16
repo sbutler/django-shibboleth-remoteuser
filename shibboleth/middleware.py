@@ -100,11 +100,40 @@ class ShibbolethRemoteUserMiddleware(RemoteUserMiddleware):
         meta = request.META
         for header, attr in SHIB_ATTRIBUTE_MAP.items():
             required, name = attr
+
+            wants_list = False
+            if name.endswith('[]'):
+                wants_list = True
+                name = name[:-2]
+
             value = meta.get(header, None)
-            shib_attrs[name] = value
+            if len(attr) > 2 and callable(attr[2]):
+                # Give the user a way to massage the data from Shibboleth;
+                # for example: split it into a list
+                value = callable(name=name, value=attr[2])
+            elif wants_list:
+                # User asked for a list but didn't give us a way to make one.
+                # Assume it's one of the standard Shibboleth attributes and split
+                # on ';'
+                value = value.split(';') if value else []
+
+            # Check that value is a list only after the user callback.
+            # Don't create a list out of a false value. If the user really
+            # wants that then they can do it in their callback.
+            if wants_list and value and not isinstance(value, list):
+                value = [value]
+
+            # Extend an existing list if it's present, otherwise
+            # just set the value.
+            if wants_list and name in shib_attrs:
+                shib_attrs[name].extend(value)
+            else:
+                shib_attrs[name] = value
+
             if not value or value == '':
                 if required:
                     error = True
+
         return shib_attrs, error
 
 class ShibbolethValidationError(Exception):

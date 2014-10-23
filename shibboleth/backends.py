@@ -106,6 +106,10 @@ class ShibbolethRemoteUserBackend(ModelBackend):
         ``set_user_<attrname>(user, value)`` and it wil be called.
         """
         for key, value in shib_meta.items():
+            if key.startswith('+'):
+                # Will be handled by the signal; ignore here
+                continue
+
             method = getattr(self, 'set_user_' + key, None)
             if method:
                 method(user, value)

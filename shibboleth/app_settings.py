@@ -8,6 +8,9 @@ default_shib_attributes = {
 } 
 
 SHIB_ATTRIBUTE_MAP = getattr(settings, 'SHIBBOLETH_ATTRIBUTE_MAP', default_shib_attributes)
+# When the user last auth'ed to the IdP. Used to determine if we should
+# re-login the user. Probably don't need to change this.
+SHIB_AUTHENTICATION_INSTANT = getattr(settings, 'SHIBBOLETH_AUTHENTICATION_INSTANT', 'Shib-Authentication-Instant')
 #Set to true if you are testing and want to insert sample headers.
 SHIB_MOCK_HEADERS = getattr(settings, 'SHIBBOLETH_MOCK_HEADERS', False)
 

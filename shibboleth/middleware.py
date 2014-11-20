@@ -1,10 +1,12 @@
+import dateutil.parser
 from django.contrib import auth
 from django.contrib.auth.backends import RemoteUserBackend
 from django.contrib.auth.middleware import RemoteUserMiddleware
 from django.contrib.auth import load_backend
 from django.core.exceptions import ImproperlyConfigured
+import time
 
-from shibboleth.app_settings import SHIB_ATTRIBUTE_MAP, SHIB_SESSION_ATTRS, LOGOUT_SESSION_KEY
+from shibboleth.app_settings import SHIB_ATTRIBUTE_MAP, SHIB_SESSION_ATTRS, LOGOUT_SESSION_KEY, SHIB_AUTHENTICATION_INSTANT
 
 class ShibbolethRemoteUserMiddleware(RemoteUserMiddleware):
     """
@@ -47,9 +49,21 @@ class ShibbolethRemoteUserMiddleware(RemoteUserMiddleware):
                     # backend failed to load
                     auth.logout(request)
             return
-        # If the user is already authenticated and that user is the user we are
-        # getting passed in the headers, then the correct user is already
-        # persisted in the session and we don't need to continue.
+        # If the user is already authenticated, that user is the user we are
+        # getting passed in the headers, and the IdP hasn't re-authed the user,
+        # then the correct user is already persisted in the session and we don't
+        # need to continue.
+        try:
+            shib_auth_instant_obj = dateutil.parser.parse(request.META[SHIB_AUTHENTICATION_INSTANT])
+            shib_auth_instant = time.mktime(shib_auth_instant_obj.timetuple())
+        except:
+            # Something went wrong (ValueError, KeyError, parsing); use the old behavior
+            shib_auth_instant = None
+            idp_reauth = False
+        else:
+            sess_auth_instant = request.session.get('shib_auth_instant', 0)
+            idp_reauth = shib_auth_instant > sess_auth_instant
+
         if request.user.is_authenticated():
             # Backwards compatable for new Django custom User models
             try:
@@ -57,7 +71,7 @@ class ShibbolethRemoteUserMiddleware(RemoteUserMiddleware):
             except AttributeError:
                 request_username = request.user.username
 
-            if request_username == self.clean_username(username, request):
+            if not idp_reauth and request_username == self.clean_username(username, request):
                 return
 
         # Make sure we have all required Shiboleth elements before proceeding.
@@ -77,6 +91,9 @@ class ShibbolethRemoteUserMiddleware(RemoteUserMiddleware):
             # User is valid.  Set request.user and persist user in the session
             # by logging the user in.
             request.user = user
+            if shib_auth_instant:
+                request.session['shib_auth_instant'] = shib_auth_instant
+
             auth.login(request, user)
             # call make profile.
             self.make_profile(user, shib_meta)

@@ -93,7 +93,7 @@ setup(
       packages=packages,
       cmdclass = cmdclasses,
       data_files=data_files,
-      requires = ['python-dateutil'],
+      requires = ['dateutil'],
 )
 
 

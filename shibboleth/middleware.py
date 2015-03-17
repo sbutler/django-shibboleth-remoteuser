@@ -74,7 +74,7 @@ class ShibbolethRemoteUserMiddleware(RemoteUserMiddleware):
             except AttributeError:
                 request_username = request.user.username
 
-            if not idp_reauth and request_username == username
+            if not idp_reauth and request_username == username:
                 return
 
         # Make sure we have all required Shiboleth elements before proceeding.

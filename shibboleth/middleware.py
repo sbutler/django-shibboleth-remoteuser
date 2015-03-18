@@ -49,9 +49,6 @@ class ShibbolethRemoteUserMiddleware(RemoteUserMiddleware):
                     # backend failed to load
                     auth.logout(request)
             return
-
-        username = self.clean_username(username, request)
-
         # If the user is already authenticated, that user is the user we are
         # getting passed in the headers, and the IdP hasn't re-authed the user,
         # then the correct user is already persisted in the session and we don't
@@ -74,7 +71,7 @@ class ShibbolethRemoteUserMiddleware(RemoteUserMiddleware):
             except AttributeError:
                 request_username = request.user.username
 
-            if not idp_reauth and request_username == username
+            if not idp_reauth and request_username == self.clean_username(username, request):
                 return
 
         # Make sure we have all required Shiboleth elements before proceeding.

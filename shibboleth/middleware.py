@@ -143,10 +143,6 @@ class ShibbolethRemoteUserMiddleware(RemoteUserMiddleware):
             if wants_list and value and not isinstance(value, list):
                 value = [value]
 
-            # If we're looking at the username attribute, clean it
-            if name == 'username':
-                value = self.clean_username(value, request)
-
             # Extend an existing list if it's present, otherwise
             # just set the value.
             if wants_list and name in shib_attrs:

@@ -116,7 +116,7 @@ class ShibbolethRemoteUserMiddleware(RemoteUserMiddleware):
         error = False
         meta = request.META
         for header, attr in SHIB_ATTRIBUTE_MAP.items():
-            required, name = attr
+            required, name = attr[:2]
 
             wants_list = False
             if name.endswith('[]'):
@@ -127,7 +127,7 @@ class ShibbolethRemoteUserMiddleware(RemoteUserMiddleware):
             if len(attr) > 2 and callable(attr[2]):
                 # Give the user a way to massage the data from Shibboleth;
                 # for example: split it into a list
-                value = callable(name=name, value=attr[2])
+                value = attr[2](name, value)
             elif wants_list:
                 # User asked for a list but didn't give us a way to make one.
                 # Assume it's one of the standard Shibboleth attributes and split

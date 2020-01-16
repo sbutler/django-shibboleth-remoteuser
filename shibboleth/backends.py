@@ -1,22 +1,19 @@
-from django.contrib.auth.models import User, Group
-from django.contrib.auth.backends import ModelBackend
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.contrib.auth.backends import RemoteUserBackend
 import django.dispatch
 
-from shibboleth.models import GroupMapping
+from .models import GroupMapping
 
-# Support Django 1.5's custom user models
-# From: django-auth-ldap/django_auth_ldap/backend.py?at=default
-try:
-    from django.contrib.auth import get_user_model
-except ImportError:
-    get_user_model = lambda: User
-
+UserModel = get_user_model()
 
 # Signals to fire to allow other people to modify the user
 populate_user = django.dispatch.Signal(providing_args=['user', 'shib_meta'])
 
 
-class ShibbolethRemoteUserBackend(ModelBackend):
+class ShibbolethRemoteUserBackend(RemoteUserBackend):
     """
     This backend is to be used in conjunction with the ``RemoteUserMiddleware``
     found in the middleware module of this package, and is used when the server
@@ -35,7 +32,7 @@ class ShibbolethRemoteUserBackend(ModelBackend):
     # Create a User object if not already in the database?
     create_unknown_user = True
 
-    def authenticate(self, remote_user, shib_meta):
+    def authenticate(self, request, remote_user, shib_meta):
         """
         The username passed as ``remote_user`` is considered trusted.  This
         method simply returns the ``User`` object with the given username,
@@ -44,31 +41,26 @@ class ShibbolethRemoteUserBackend(ModelBackend):
         Returns None if ``create_unknown_user`` is ``False`` and a ``User``
         object with the given username is not found in the database.
         """
-
-	if not remote_user:
+        if not remote_user:
             return
         user = None
         username = self.clean_username(remote_user)
 
-        UserModel = get_user_model()
-        # Backwards compatable for custom User models
-        username_field = getattr(UserModel, 'USERNAME_FIELD', 'username')
-
-	# Note that this could be accomplished in one try-except clause, but
+        # Note that this could be accomplished in one try-except clause, but
         # instead we use get_or_create when creating unknown users since it has
         # built-in safeguards for multiple threads.
         if self.create_unknown_user:
             user, created = UserModel.objects.get_or_create(**{
-                username_field: username
+                UserModel.USERNAME_FIELD: username
             })
             if created:
                 user = self.configure_user(user)
         else:
             try:
                 user = UserModel.objects.get(**{
-                    username_field: username
+                    UserModel.USERNAME_FIELD: username
                 })
-            except User.DoesNotExist:
+            except UserModel.DoesNotExist:
                 pass
 
         if user:
@@ -76,24 +68,7 @@ class ShibbolethRemoteUserBackend(ModelBackend):
             populate_user.send(self.__class__, user=user, shib_meta=shib_meta)
             user.save()
 
-        return user
-
-    def clean_username(self, username):
-        """
-        Performs any cleaning on the "username" prior to using it to get or
-        create the user object.  Returns the cleaned username.
-
-        By default, returns the username unchanged.
-        """
-        return username
-    
-    def configure_user(self, user):
-        """
-        Configures a user after creation and returns the updated user.
-
-        By default, returns the user unmodified.
-        """
-        return user
+        return user if self.user_can_authenticate(user) else None
 
     def populate_user(self, user, shib_meta):
         """

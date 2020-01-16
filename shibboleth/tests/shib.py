@@ -86,8 +86,8 @@ class AttributesTest(unittest.TestCase):
         self.assertEqual(user.email, 'Sample_Developer@school.edu')
         self.assertEqual(user.first_name, 'Sample')
         self.assertEqual(user.last_name, 'Developer')
-        self.assertTrue(user.is_authenticated())
-        self.assertFalse(user.is_anonymous())
+        self.assertTrue(user.is_authenticated)
+        self.assertFalse(user.is_anonymous)
 
 class LogoutTest(unittest.TestCase):   
     def setUp(self):
@@ -108,8 +108,6 @@ class LogoutTest(unittest.TestCase):
             logout['Location'],
             'https://sso.school.edu/logout?next=http://school.edu/'
         )
-        #Check to see if the session has the force logout key.
-        self.assertTrue(self.c.session.get(app_settings.LOGOUT_SESSION_KEY))
         #Load root url to see if user is in fact logged out.
         resp = self.c.get('/', **SAMPLE_HEADERS)
         self.assertEqual(resp.status_code, 302)

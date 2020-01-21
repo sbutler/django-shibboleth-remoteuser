@@ -136,6 +136,11 @@ class ShibbolethRemoteUserMiddleware(RemoteUserMiddleware):
                 name = name[:-2]
 
             value = meta.get(header, None)
+            try:
+                value = value.decode('utf-8', errors='strict')
+            except UnicodeDecodeError:
+                pass
+
             if callable(attr_processor):
                 # Give the user a way to massage the data from Shibboleth;
                 # for example: split it into a list
